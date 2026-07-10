@@ -1,0 +1,26 @@
+﻿  error.cpp
+  fft.cpp
+  firdes.cpp
+  firfilt.cpp
+d:\reasonix\信号分析\signalanalyzertool\liquid\filter\firfilt.h(20): warning C4267: “return”: 从“size_t”转换到“unsigned int”，可能丢失数据
+d:\reasonix\信号分析\signalanalyzertool\liquid\filter\firfilt.cpp(23): warning C4267: “=”: 从“size_t”转换到“unsigned int”，可能丢失数据
+d:\reasonix\信号分析\signalanalyzertool\liquid\filter\firfilt.cpp(42): warning C4267: “=”: 从“size_t”转换到“unsigned int”，可能丢失数据
+  nco.cpp
+  modem.cpp
+  agc.cpp
+  random.cpp
+  identify.cpp
+d:\reasonix\信号分析\signalanalyzertool\liquid\signal\identify.cpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+d:\reasonix\信号分析\signalanalyzertool\liquid\filter\firfilt.h(20): warning C4267: “return”: 从“size_t”转换到“unsigned int”，可能丢失数据
+d:\reasonix\信号分析\signalanalyzertool\liquid\signal\identify.cpp(276): warning C4267: “初始化”: 从“size_t”转换到“unsigned int”，可能丢失数据
+d:\reasonix\信号分析\signalanalyzertool\liquid\signal\identify.cpp(316): warning C4267: “初始化”: 从“size_t”转换到“unsigned int”，可能丢失数据
+  demod.cpp
+d:\reasonix\信号分析\signalanalyzertool\liquid\filter\firfilt.h(20): warning C4267: “return”: 从“size_t”转换到“unsigned int”，可能丢失数据
+  liquid_dll.cpp
+d:\reasonix\信号分析\signalanalyzertool\liquid\filter\firfilt.h(20): warning C4267: “return”: 从“size_t”转换到“unsigned int”，可能丢失数据
+    正在创建库 D:\reasonix\信号分析\x64\Release\liquid.lib 和对象 D:\reasonix\信号分析\x64\Release\liquid.exp
+  正在生成代码
+  All 480 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  已完成代码的生成
+  liquid.vcxproj -> D:\reasonix\信号分析\x64\Release\liquid.dll
+  已复制         1 个文件。

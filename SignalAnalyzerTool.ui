@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SignalAnalyzerToolClass</class>
+ <widget class="QMainWindow" name="SignalAnalyzerToolClass">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Signal Analyzer Tool</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QGroupBox" name="groupBoxParams">
+      <property name="title">
+       <string>Signal Parameters</string>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayoutParams">
+       <item>
+        <widget class="QLabel" name="labelFile">
+         <property name="text">
+          <string>Data File:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEditFile">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="placeholderText">
+          <string>Select a .dat file...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnBrowse">
+         <property name="text">
+          <string>Browse</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelSampleRate">
+         <property name="text">
+          <string>Sample Rate (Hz):</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QDoubleSpinBox" name="spinSampleRate">
+         <property name="minimum">
+          <double>1000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>100000.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="labelSignalType">
+         <property name="text">
+          <string>Signal Type:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="comboSignalType">
+         <item>
+          <property name="text">
+           <string>Complex IQ</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Real (I only)</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayoutButtons">
+      <item>
+       <widget class="QPushButton" name="btnAnalyze">
+        <property name="styleSheet">
+         <string notr="true">background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;</string>
+        </property>
+        <property name="text">
+         <string>Analyze Signal</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnDemod">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background-color: #2196F3; color: white; font-weight: bold; padding: 8px;</string>
+        </property>
+        <property name="text">
+         <string>Demodulate</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnClear">
+        <property name="styleSheet">
+         <string notr="true">background-color: #f44336; color: white; padding: 8px;</string>
+        </property>
+        <property name="text">
+         <string>Clear</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QSplitter" name="splitterMain">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QWidget" name="widgetResults">
+       <layout class="QVBoxLayout" name="verticalLayoutResults">
+        <item>
+         <widget class="QGroupBox" name="groupBoxResults">
+          <property name="title">
+           <string>Analysis Results</string>
+          </property>
+          <layout class="QFormLayout" name="formLayoutResults">
+           <item row="0" column="0">
+            <widget class="QLabel" name="lblCenterFreqTitle">
+             <property name="text">
+              <string>Center Frequency:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLabel" name="lblCenterFreq">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="lblSymbolRateTitle">
+             <property name="text">
+              <string>Symbol Rate:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLabel" name="lblSymbolRate">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="lblBandwidthTitle">
+             <property name="text">
+              <string>Bandwidth:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QLabel" name="lblBandwidth">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="lblSNRTitle">
+             <property name="text">
+              <string>SNR:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QLabel" name="lblSNR">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="lblModTypeTitle">
+             <property name="text">
+              <string>Modulation Type:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QLabel" name="lblModType">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QLabel" name="lblModOrderTitle">
+             <property name="text">
+              <string>Modulation Order:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QLabel" name="lblModOrder">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupBoxSymbolRate">
+          <property name="title">
+           <string>Manual Override</string>
+          </property>
+          <layout class="QFormLayout" name="formLayoutOverride">
+           <item row="0" column="0">
+            <widget class="QLabel" name="lblOverrideSymbolRate">
+             <property name="text">
+              <string>Symbol Rate (sym/s):</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QDoubleSpinBox" name="spinSymbolRate">
+             <property name="minimum">
+              <double>1.000000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>100000000.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>100000.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="lblOverrideModType">
+             <property name="text">
+              <string>Modulation Type:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="comboModType">
+             <item>
+              <property name="text">
+               <string>Auto</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>BPSK</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>QPSK</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>8PSK</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>16QAM</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>64QAM</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="verticalSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="widgetPlots">
+       <layout class="QVBoxLayout" name="verticalLayoutPlots">
+        <item>
+         <widget class="QWidget" name="plotPSDContainer" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>250</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="plotConstellationContainer" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>250</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="lblStatus">
+      <property name="styleSheet">
+       <string notr="true">color: gray; padding: 4px;</string>
+      </property>
+      <property name="text">
+       <string>Ready</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QTextEdit" name="textLog">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>150</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">font-family: Consolas; font-size: 10pt; background-color: #1e1e1e; color: #d4d4d4;</string>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="placeholderText">
+       <string>Debug output will appear here...</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1200</width>
+     <height>23</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
