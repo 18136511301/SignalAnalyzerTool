@@ -189,7 +189,6 @@ LIQUID_API int liquid_signal_identify_rf32(
     float sample_rate, SignalInfo* info) {
     try {
         SignalIdentifier id(sample_rate);
-        // Real data with Q=0 (not IQ-interleaved)
         SignalInfo result = id.identify(iq_data, num_samples, false);
         *info = result;
         return LIQUID_OK;
@@ -220,6 +219,28 @@ LIQUID_API void liquid_demod_get_soft_symbols(void* q, ComplexFloat* buffer, uns
     if (q && buffer && n)
         static_cast<Demodulator*>(q)->get_soft_symbols(
             reinterpret_cast<std::complex<float>*>(buffer), *n);
+}
+
+// ==================== V2 API ====================
+LIQUID_API int liquid_signal_identify_v2(
+    const IdentifyParams* params,
+    IdentifyResult* result) {
+    try {
+        if (!params || !result) return LIQUID_EIOBJ;
+        SignalIdentifier id(params->sample_rate);
+        return id.identify_v2(params, result);
+    } catch (...) { return LIQUID_EINT; }
+}
+
+LIQUID_API int liquid_demodulate_v2(
+    const DemodInput* input,
+    DemodOutput* output) {
+    try {
+        if (!input || !output) return LIQUID_EIOBJ;
+        Demodulator demod(static_cast<ModulationType>(input->modulation_type),
+                          input->symbol_rate, input->sample_rate);
+        return demod.demodulate_v2(input, output);
+    } catch (...) { return LIQUID_EINT; }
 }
 
 // ==================== Utilities ====================

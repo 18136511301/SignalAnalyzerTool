@@ -86,4 +86,77 @@ struct SignalInfo {
                    snr(0), modulation_type(0), modulation_order(0) {}
 };
 
+// Signal type enumeration
+enum SignalType {
+    LIQUID_SIGNAL_REAL = 0,     // Real signal (mono, 1 channel)
+    LIQUID_SIGNAL_COMPLEX = 1   // Complex IQ signal (I/Q interleaved)
+};
+
+// ==================== New V2 API Structures ====================
+
+// Signal identification input parameters
+struct IdentifyParams {
+    const void* data;       // Raw binary data (int16_t or float, as-is from file)
+    unsigned int data_len;  // Length of data in BYTES
+    int bit_width;          // Sample bit width: 16 (int16), 32 (float)
+    int signal_type;        // SignalType: REAL or COMPLEX
+    float sample_rate;      // Sample rate in Hz
+
+    IdentifyParams()
+        : data(nullptr), data_len(0), bit_width(16),
+          signal_type(LIQUID_SIGNAL_REAL), sample_rate(100000.0f) {}
+};
+
+// Signal identification output result (V2)
+struct IdentifyResult {
+    float center_freq;      // Estimated center frequency (Hz)
+    float symbol_rate;      // Estimated symbol rate (symbols/s)
+    float bandwidth;        // Estimated 3dB bandwidth (Hz)
+    float snr;              // Estimated SNR (dB)
+    int   modulation_type;  // ModulationType enum value
+    int   modulation_order; // Constellation order (2, 4, 8, 16, ...)
+    int   bits_per_symbol;  // Bits per symbol (1, 2, 3, 4, ...)
+    int   confidence;       // Classification confidence (0-100)
+
+    IdentifyResult()
+        : center_freq(0), symbol_rate(0), bandwidth(0), snr(0),
+          modulation_type(0), modulation_order(0), bits_per_symbol(0),
+          confidence(0) {}
+};
+
+// Demodulation input parameters (V2)
+struct DemodInput {
+    const void* data;           // Raw binary data
+    unsigned int data_len;      // Length of data in BYTES
+    int bit_width;              // Sample bit width: 16 (int16), 32 (float)
+    int signal_type;            // SignalType: REAL or COMPLEX
+    float sample_rate;          // Sample rate (Hz)
+    float carrier_freq;         // Carrier/center frequency (Hz)
+    float symbol_rate;          // Modulation symbol rate (symbols/s)
+    int   modulation_type;      // ModulationType enum value
+
+    DemodInput()
+        : data(nullptr), data_len(0), bit_width(16),
+          signal_type(LIQUID_SIGNAL_REAL), sample_rate(100000.0f),
+          carrier_freq(0), symbol_rate(10000),
+          modulation_type(LIQUID_MODEM_BPSK) {}
+};
+
+// Demodulation output result (V2)
+struct DemodOutput {
+    unsigned int* hard_symbols;     // Hard-decision symbol indices (caller allocates)
+    ComplexFloat* soft_symbols;     // Soft-decision I/Q before decision (caller allocates)
+    unsigned int  hard_count;       // Number of hard symbols written
+    unsigned int  soft_count;       // Number of soft symbols written
+    unsigned int  hard_capacity;    // Max hard symbols the buffer can hold
+    unsigned int  soft_capacity;    // Max soft symbols the buffer can hold
+    bool          locked;           // PLL locked indicator
+    float         freq_offset;      // Estimated residual frequency offset (Hz)
+
+    DemodOutput()
+        : hard_symbols(nullptr), soft_symbols(nullptr),
+          hard_count(0), soft_count(0), hard_capacity(0), soft_capacity(0),
+          locked(false), freq_offset(0) {}
+};
+
 } // namespace liquid

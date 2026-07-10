@@ -51,7 +51,7 @@ LIQUID_API void  liquid_rand_destroy(void* q);
 LIQUID_API float liquid_randf(void* q);
 LIQUID_API float liquid_randn(void* q);
 
-// Signal Processing
+// Signal Processing (Legacy - backward compatible)
 LIQUID_API int liquid_signal_identify_cf32(
     const liquid::ComplexFloat* iq_data, unsigned int num_samples,
     float sample_rate, liquid::SignalInfo* info);
@@ -59,13 +59,24 @@ LIQUID_API int liquid_signal_identify_rf32(
     const float* iq_data, unsigned int num_samples,
     float sample_rate, liquid::SignalInfo* info);
 
-// Demodulation
+// Demodulation (Legacy - backward compatible)
 LIQUID_API void* liquid_demod_create(int modulation_type, float symbol_rate, float sample_rate);
 LIQUID_API void  liquid_demod_destroy(void* q);
 LIQUID_API int   liquid_demod_execute(void* q, const liquid::ComplexFloat* iq_data,
                                       unsigned int n, unsigned int* symbols, unsigned int* num_symbols);
 LIQUID_API void  liquid_demod_set_center_freq(void* q, float freq_hz);
 LIQUID_API void  liquid_demod_get_soft_symbols(void* q, liquid::ComplexFloat* buffer, unsigned int* n);
+
+// ==================== V2 API ====================
+// Signal Identification V2: accepts raw binary data, auto-converts bit width
+LIQUID_API int liquid_signal_identify_v2(
+    const liquid::IdentifyParams* params,
+    liquid::IdentifyResult* result);
+
+// Demodulation V2: accepts raw binary data, outputs hard + soft decisions
+LIQUID_API int liquid_demodulate_v2(
+    const liquid::DemodInput* input,
+    liquid::DemodOutput* output);
 
 // Utilities
 LIQUID_API const char* liquid_version(void);

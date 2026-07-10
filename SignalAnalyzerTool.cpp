@@ -426,7 +426,7 @@ void SignalAnalyzerTool::onDemodulate()
     }
 
     setStatus("Demodulating...");
-    appendLog("=== Demodulating ===");
+    appendLog("=== Demodulating (V2) ===");
     QApplication::processEvents();
     QElapsedTimer timer;
     timer.start();
@@ -439,101 +439,96 @@ void SignalAnalyzerTool::onDemodulate()
     if (ui.comboModType->currentIndex() == 0)
         symbolRate = m_lastInfo.symbol_rate;
 
-    void* demod = liquid_demod_create(modType, symbolRate, m_sampleRate);
-    if (!demod) { setStatus("Error: Failed to create demodulator"); return; }
-
-    // Build complex buffer
-    QVector<ComplexFloat> iq;
-    if (m_isComplex) {
-        int nc = m_iqData.size() / 2;
-        iq.resize(nc);
-        for (int i = 0; i < nc; i++) {
-            iq[i].real = m_iqData[2 * i];
-            iq[i].imag = m_iqData[2 * i + 1];
-        }
-    } else {
-        iq.resize(m_iqData.size());
-        for (int i = 0; i < m_iqData.size(); i++) {
-            iq[i].real = m_iqData[i];
-            iq[i].imag = 0.0f;
-        }
+    // Build raw binary data buffer (keep original int16 format)
+    QByteArray rawData;
+    QFile file(m_filePath);
+    if (file.open(QIODevice::ReadOnly)) {
+        rawData = file.readAll();
+        file.close();
     }
-    liquid_demod_set_center_freq(demod, m_lastInfo.center_freq);
-
-    // Block processing
-    const int BLOCK_SIZE = 65536;
-    QVector<unsigned int> allSymbols;
-    allSymbols.reserve(iq.size() / 10);
-    uint64_t totalSymbols = 0;
-    int totalProcessed = 0;
-    int totalSamples = iq.size();
-
-    m_tabWidget->setCurrentIndex(1);  // switch to demod tab
-
-    while (totalProcessed < totalSamples) {
-        int bs = qMin(BLOCK_SIZE, totalSamples - totalProcessed);
-        QVector<unsigned int> blockSymbols(bs);
-        unsigned int blockNumSymbols = 0;
-
-        int ret = liquid_demod_execute(demod, iq.constData() + totalProcessed,
-                                        bs, blockSymbols.data(), &blockNumSymbols);
-        if (ret != 0) {
-            liquid_demod_destroy(demod);
-            setStatus("Demodulation failed");
-            return;
-        }
-        for (unsigned int i = 0; i < blockNumSymbols; i++)
-            allSymbols.append(blockSymbols[i]);
-        totalSymbols += blockNumSymbols;
-        totalProcessed += bs;
-
-        // Build constellation from soft symbols (matched filter output before decision)
-        const unsigned int MAX_SOFT = 4096;
-        ComplexFloat softBuf[MAX_SOFT];
-        unsigned int softCount = MAX_SOFT;
-        liquid_demod_get_soft_symbols(demod, softBuf, &softCount);
-        QVector<ComplexFloat> constellation;
-        if (softCount > 0) {
-            unsigned int step = softCount / qMin(softCount, 4096u);
-            if (step < 1) step = 1;
-            for (unsigned int i = 0; i < softCount && constellation.size() < 4096; i += step)
-                constellation.append(softBuf[i]);
-        }
-        plotConstellation(constellation);
-        updateDemodStatus(totalSymbols > 0, (unsigned int)allSymbols.size(),
-                          m_lastInfo.center_freq, symbolRate, timer.elapsed());
-        setStatus(QString("Demodulating... %1% (%2 symbols)")
-                  .arg(totalProcessed * 100 / totalSamples).arg(totalSymbols));
-        QApplication::processEvents();
+    if (rawData.isEmpty()) {
+        setStatus("Error: Cannot re-read data file");
+        return;
     }
 
-    liquid_demod_destroy(demod);
-    
-    // Save demodulated bits to file for verification
+    // Prepare V2 demodulation input
+    DemodInput demodIn;
+    demodIn.data = rawData.constData();
+    demodIn.data_len = static_cast<unsigned int>(rawData.size());
+    demodIn.bit_width = 16;
+    demodIn.signal_type = m_isComplex ? LIQUID_SIGNAL_COMPLEX : LIQUID_SIGNAL_REAL;
+    demodIn.sample_rate = m_sampleRate;
+    demodIn.carrier_freq = m_lastInfo.center_freq;
+    demodIn.symbol_rate = symbolRate;
+    demodIn.modulation_type = modType;
+
+    // Estimate symbol count for buffer allocation
+    unsigned int estSymbols = static_cast<unsigned int>(m_iqData.size() / (m_sampleRate / symbolRate)) + 1024;
+
+    // Prepare output
+    QVector<unsigned int> hardBuf(estSymbols);
+    QVector<ComplexFloat> softBuf(estSymbols);
+
+    DemodOutput demodOut;
+    demodOut.hard_symbols = hardBuf.data();
+    demodOut.soft_symbols = softBuf.data();
+    demodOut.hard_capacity = estSymbols;
+    demodOut.soft_capacity = estSymbols;
+
+    int ret = liquid_demodulate_v2(&demodIn, &demodOut);
+    qint64 elapsed = timer.elapsed();
+
+    if (ret != 0) {
+        setStatus("Demodulation failed");
+        appendLog("ERROR: liquid_demodulate_v2 returned " + QString::number(ret));
+        return;
+    }
+
+    m_tabWidget->setCurrentIndex(1);
+
+    // Update constellation with soft symbols
+    QVector<ComplexFloat> constellation;
+    unsigned int step = demodOut.soft_count > 4096 ? demodOut.soft_count / 4096 : 1;
+    for (unsigned int i = 0; i < demodOut.soft_count && constellation.size() < 4096; i += step)
+        constellation.append(softBuf[i]);
+    plotConstellation(constellation);
+
+    // Update demod status
+    updateDemodStatus(demodOut.locked, demodOut.hard_count,
+                      demodOut.freq_offset, symbolRate, elapsed);
+
+    // Save hard decisions to file
     {
-        QFile saveFile(QFileInfo(m_filePath).absolutePath() + "/demod_out.dat");
+        QString outPath = QFileInfo(m_filePath).absolutePath() + "/demod_out.dat";
+        QFile saveFile(outPath);
         if (saveFile.open(QIODevice::WriteOnly)) {
-            for (unsigned int i = 0; i < (unsigned int)allSymbols.size(); i++) {
-                // Format: same as reference file
-                // bit0 = I hard decision (0 or 1)
-                // bit4 = Q hard decision (0 for BPSK)
-                unsigned short val = 0;
-                if (allSymbols[i] != 0) val |= 0x0001;      // bit 0
-                // Check Q from soft symbols for bit4
-                if (i < (unsigned int)allSymbols.size()) val |= 0x0000;  // Q=0 for BPSK
+            for (unsigned int i = 0; i < demodOut.hard_count; i++) {
+                unsigned short val = static_cast<unsigned short>(hardBuf[i]);
                 saveFile.write((const char*)&val, sizeof(val));
             }
             saveFile.close();
-            appendLog(QString("Saved %1 symbols to demod_out.dat").arg(allSymbols.size()));
+            appendLog(QString("Saved %1 hard symbols to %2").arg(demodOut.hard_count).arg(outPath));
         }
     }
-    
-    updateDemodStatus(totalSymbols > 0, (unsigned int)allSymbols.size(),
-                      m_lastInfo.center_freq, symbolRate, timer.elapsed());
 
-    qint64 elapsed = timer.elapsed();
-    appendLog(QString("Demodulated %1 symbols in %2 ms").arg(totalSymbols).arg(elapsed));
-    setStatus(QString("Done: %1 symbols in %2 ms").arg(totalSymbols).arg(elapsed));
+    // Save soft symbols (I/Q float pairs) to file
+    {
+        QString outPath = QFileInfo(m_filePath).absolutePath() + "/demod_soft_out.dat";
+        QFile saveFile(outPath);
+        if (saveFile.open(QIODevice::WriteOnly)) {
+            for (unsigned int i = 0; i < demodOut.soft_count; i++) {
+                float vals[2] = { softBuf[i].real, softBuf[i].imag };
+                saveFile.write((const char*)vals, sizeof(vals));
+            }
+            saveFile.close();
+            appendLog(QString("Saved %1 soft symbols to %2").arg(demodOut.soft_count).arg(outPath));
+        }
+    }
+
+    appendLog(QString("Demodulated %1 symbols in %2 ms").arg(demodOut.hard_count).arg(elapsed));
+    appendLog(QString("PLL locked: %1").arg(demodOut.locked ? "Yes" : "No"));
+    appendLog(QString("Freq offset: %1 Hz").arg(QString::number(demodOut.freq_offset, 'f', 1)));
+    setStatus(QString("Done: %1 symbols in %2 ms").arg(demodOut.hard_count).arg(elapsed));
 }
 
 // ====== Clear ======
@@ -622,7 +617,7 @@ void SignalAnalyzerTool::plotPSD()
     double maxPsd = -1e100;
 
     for (int i = 0; i < halfSize; i++) {
-        psd[i] = 10.0 * log10(psdSum[i + halfSize] / numAvgs + 1e-20);
+        psd[i] = 10.0 * log10(psdSum[i] / numAvgs + 1e-20);
         if (psd[i] > maxPsd) maxPsd = psd[i];
         freq[i] = i * freqRes;
     }
@@ -675,9 +670,8 @@ void SignalAnalyzerTool::plotWaterfall()
         }
         liquid_fft_execute_forward(fft, buf.data(), buf.data());
         for (int i = 0; i < halfSize; i++) {
-            int idx = i + halfSize;  // positive frequencies (0 ~ fs/2)
             m_waterfallData[row][i] = 10.0 * log10(
-                buf[idx].real * buf[idx].real + buf[idx].imag * buf[idx].imag + 1e-20);
+                buf[i].real * buf[i].real + buf[i].imag * buf[i].imag + 1e-20);
         }
     }
     liquid_fft_destroy(fft);

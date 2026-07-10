@@ -5,6 +5,7 @@
 #include "../filter/firfilt.h"
 #include "../agc/agc.h"
 #include <complex>
+#include <vector>
 
 namespace liquid {
 
@@ -13,22 +14,27 @@ public:
     Demodulator(ModulationType type, float symbol_rate, float sample_rate);
     ~Demodulator();
 
+    // Legacy API
     int execute(const std::complex<float>* iq_data, unsigned int n, 
                 unsigned int* symbols, unsigned int& num_symbols);
-    
     int execute_single(std::complex<float> sample, unsigned int& symbol);
-    
     void set_center_freq(float freq_hz);
-    
     void get_soft_symbols(std::complex<float>* buffer, unsigned int& n);
 
+    // V2 API: full demodulation with hard + soft output
+    int demodulate_v2(const DemodInput* input, DemodOutput* output);
+
 private:
+    // Internal: process a block of complex samples through the demod chain
+    void process_block(const std::complex<float>* iq_data, unsigned int n,
+                       std::vector<unsigned int>& hard_out,
+                       std::vector<std::complex<float>>& soft_out);
+
     void init_filter(float symbol_rate, float sample_rate);
     
     Modem m_modem;
     Nco m_nco;
     Agc m_agc;
-    std::vector<std::complex<float>> m_matched_filter_taps;
     FirFilter* m_matched_filter;
     float m_sample_rate;
     float m_symbol_rate;
@@ -39,10 +45,12 @@ private:
     float m_centerFreq;
     
     // Costas loop for carrier tracking
-    float m_pll_phase;
-    float m_pll_freq;
-    float m_pll_alpha;
-    float m_pll_beta;
+    float m_pll_freq;       // NCO frequency correction (rad/symbol)
+    float m_pll_alpha;      // Proportional gain
+    float m_pll_beta;       // Integrator gain
+    bool  m_pll_locked;     // Lock detector
+    float m_pll_lock_avg;   // Lock detector averaging
+    float m_agc_rssi;       // RSSI for SNR estimation
 };
 
 } // namespace liquid
