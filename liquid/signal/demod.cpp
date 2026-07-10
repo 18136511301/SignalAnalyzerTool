@@ -2,19 +2,20 @@
 #include "../filter/firdes.h"
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 
 namespace liquid {
 
 const float Demodulator::PI = 3.14159265358979323846f;
 
 Demodulator::Demodulator(ModulationType type, float symbol_rate, float sample_rate)
-    : m_modem(type), m_nco(NCO_COMPLEX), m_agc(0.02f),
+    : m_modem(type), m_nco(NCO_COMPLEX), m_agc(0.05f),
       m_matched_filter(nullptr), m_sample_rate(sample_rate),
       m_symbol_rate(symbol_rate), m_samples_per_symbol(sample_rate / symbol_rate),
       m_sample_counter(0), m_centerFreq(0.0f),
       m_pll_freq(0.0f),
-      m_pll_alpha(0.01f), m_pll_beta(0.0001f),
-      m_pll_locked(false), m_pll_lock_avg(0.0f), m_agc_rssi(0.0f) {
+      m_pll_alpha(0.02f), m_pll_beta(0.0004f),
+      m_pll_locked(false), m_pll_lock_avg(1.0f), m_agc_rssi(0.0f) {
     init_filter(symbol_rate, sample_rate);
 }
 
@@ -29,16 +30,13 @@ void Demodulator::set_center_freq(float freq_hz) {
 }
 
 void Demodulator::init_filter(float symbol_rate, float sample_rate) {
-    // Matched filter: root raised cosine or simple integrate-and-dump
-    unsigned int sps = static_cast<unsigned int>(m_samples_per_symbol);
-    unsigned int n = sps * 4;  // 4 symbol lengths
-    if (n < 31) n = 31;
-    if (n % 2 == 0) n++;
+    // Integrate-and-dump matched filter for rectangular pulses
+    // Length = 1 symbol period (samples_per_symbol samples)
+    unsigned int sps = static_cast<unsigned int>(m_samples_per_symbol + 0.5f);
+    if (sps < 4) sps = 4;
 
-    // Use Kaiser lowpass with cutoff at 0.5 * symbol_rate / sample_rate
-    // (half the symbol bandwidth, for matched filtering)
-    float fc = 0.5f * symbol_rate / sample_rate;
-    auto taps = FirDes::design_kaiser_lowpass(n, fc, 60.0f);
+    // Rectangular integrate-and-dump: all taps = 1/sps (normalized)
+    std::vector<float> taps(sps, 1.0f / sps);
     m_matched_filter = new FirFilter(taps);
 }
 
@@ -70,10 +68,10 @@ int Demodulator::demodulate_v2(const DemodInput* input, DemodOutput* output) {
     m_nco.set_frequency(dtheta);
     m_nco.set_phase(0.0f);
 
-    // Reset PLL
+    // Reset PLL - start with wider bandwidth for acquisition
     m_pll_freq = 0.0f;
     m_pll_locked = false;
-    m_pll_lock_avg = 0.0f;
+    m_pll_lock_avg = 1.0f;
 
     // Reset AGC
     m_agc.reset();
@@ -117,7 +115,7 @@ int Demodulator::demodulate_v2(const DemodInput* input, DemodOutput* output) {
             }
         }
     } else {
-        return -1;  // Unsupported bit width
+        return -1;
     }
 
     if (num_samples < 64) return -1;
@@ -170,11 +168,12 @@ void Demodulator::process_block(const std::complex<float>* iq_data, unsigned int
                                  std::vector<std::complex<float>>& soft_out) {
     hard_out.clear();
     soft_out.clear();
-    hard_out.reserve(n / static_cast<unsigned int>(m_samples_per_symbol) + 1);
-    soft_out.reserve(n / static_cast<unsigned int>(m_samples_per_symbol) + 1);
+    unsigned int sps = static_cast<unsigned int>(m_samples_per_symbol + 0.5f);
+    hard_out.reserve(n / sps + 1);
+    soft_out.reserve(n / sps + 1);
 
-    float pll_err_avg = 0.0f;
-    unsigned int pll_err_cnt = 0;
+    unsigned int pll_lock_counter = 0;
+    unsigned int symbol_count = 0;
 
     for (unsigned int i = 0; i < n; i++) {
         std::complex<float> sample = iq_data[i];
@@ -187,16 +186,17 @@ void Demodulator::process_block(const std::complex<float>* iq_data, unsigned int
         // AGC
         m_agc.execute(sample);
 
-        // Matched filter
+        // Matched filter (integrate-and-dump)
         std::complex<float> filtered;
         m_matched_filter->execute(sample, filtered);
 
         // Symbol timing: count samples, strobe at symbol rate
         m_sample_counter++;
-        if (m_sample_counter >= static_cast<unsigned int>(m_samples_per_symbol)) {
+        if (m_sample_counter >= sps) {
             m_sample_counter = 0;
+            symbol_count++;
 
-            // Store soft symbol (I/Q before hard decision)
+            // Store soft symbol
             soft_out.push_back(filtered);
             m_softSymbols.push_back(filtered);
             if (m_softSymbols.size() > 4096)
@@ -214,19 +214,27 @@ void Demodulator::process_block(const std::complex<float>* iq_data, unsigned int
                 float sQ = (filtered.imag() >= 0.0f ? 1.0f : -1.0f);
                 pll_err = sI * filtered.imag() - sQ * filtered.real();
             } else {
-                // Generic: use decision-directed error
                 pll_err = (filtered.real() >= 0.0f ? 1.0f : -1.0f) * filtered.imag();
             }
 
-            // PLL update
-            m_pll_freq += m_pll_beta * pll_err;
+            // PLL loop filter (2nd order)
+            // Adaptive bandwidth: wider during acquisition, narrower when locked
+            float alpha = m_pll_alpha;
+            float beta = m_pll_beta;
+            if (!m_pll_locked && symbol_count < 5000) {
+                alpha *= 3.0f;
+                beta *= 3.0f;
+            }
+
+            m_pll_freq += beta * pll_err;
             float base_dtheta = 2.0f * PI * m_centerFreq / m_sample_rate;
-            float pll_correction = m_pll_alpha * pll_err + m_pll_freq;
+            float pll_correction = alpha * pll_err + m_pll_freq;
             m_nco.set_frequency(base_dtheta + pll_correction * m_symbol_rate / m_sample_rate);
 
-            // Lock detector (exponential averaging of |error|)
-            m_pll_lock_avg = 0.99f * m_pll_lock_avg + 0.01f * std::abs(pll_err);
-            m_pll_locked = (m_pll_lock_avg < 0.3f);
+            // Lock detector
+            float abs_err = std::abs(pll_err);
+            m_pll_lock_avg = 0.999f * m_pll_lock_avg + 0.001f * abs_err;
+            m_pll_locked = (m_pll_lock_avg < 0.2f);
 
             // Hard decision
             unsigned int symbol;
