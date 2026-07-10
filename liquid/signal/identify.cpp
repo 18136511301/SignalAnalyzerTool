@@ -125,8 +125,8 @@ int SignalIdentifier::identify_v2(const IdentifyParams* params, IdentifyResult* 
             result->bandwidth = estimate_bandwidth_3db(bb_psd, bb_freq);
         }
 
-        // 5) Symbol rate (delay-multiply method for real signals)
-        result->symbol_rate = estimate_symbol_rate_real(i_data.data(), num_samples);
+        // 5) Symbol rate (use downconverted baseband with delay-multiply)
+        result->symbol_rate = estimate_symbol_rate(baseband.data(), num_samples);
 
         // 6) Modulation classification
         unsigned int classify_n = (num_samples < 4000) ? num_samples : 4000;
@@ -419,8 +419,8 @@ SignalInfo SignalIdentifier::identify(const float* iq_data, unsigned int n, bool
         info.bandwidth = estimate_bandwidth_3db(bb_psd, bb_freq);
     }
 
-    // 4) Symbol rate (delay-multiply)
-    info.symbol_rate = estimate_symbol_rate_real(iq_data, n);
+    // 4) Symbol rate (use downconverted baseband)
+    info.symbol_rate = estimate_symbol_rate(baseband.data(), n);
 
     // 5) Modulation
     unsigned int classify_n = (n < 2000) ? n : 2000;
